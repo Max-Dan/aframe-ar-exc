@@ -38,9 +38,12 @@
     <button id="clear">Clear</button>
   </div>
 
-  <a-scene renderer="colorManagement: true; physicallyCorrectLights: true"
-    webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay" xr-mode-ui="enabled: true" ar-hit-test>
-    <!-- Lights -->
+<a-scene
+  renderer="colorManagement: true; physicallyCorrectLights: true"
+  webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
+  xr-mode-ui="enterAREnabled: true; XRMode: ar"
+  ar-hit-test>
+      <!-- Lights -->
     <a-entity light="type: ambient; intensity: 0.5"></a-entity>
     <a-entity light="type: directional; intensity: 0.9" position="1 2 1"></a-entity>
 
