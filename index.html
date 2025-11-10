@@ -1,49 +1,50 @@
 <!doctype html>
 <html>
-
 <head>
   <meta charset="utf-8" />
   <title>Winter AR — Snowman & Pines</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-    }
-
+    :root { --ui-bg: rgba(255,255,255,.92); }
+    html,body { height:100%; }
+    body { margin:0; font-family: system-ui, sans-serif; }
+    /* Always keep overlay clickable above scene (including in AR DOM overlay) */
     #overlay {
-      position: fixed;
-      inset: 8px auto auto 8px;
-      z-index: 9999;
-      display: flex;
-      gap: 8px;
+      position: fixed; left: 8px; top: 8px; z-index: 999999;
+      display: flex; gap: 8px; flex-wrap: wrap;
+      background: var(--ui-bg); padding: 8px; border-radius: 12px;
+      pointer-events: auto;
     }
-
     #overlay button {
-      padding: 8px 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      background: #fff;
+      padding: 8px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff;
+      touch-action: manipulation; font-weight: 600;
     }
+    #status {
+      position: fixed; right: 8px; top: 8px; z-index: 999999;
+      background: var(--ui-bg); padding: 6px 10px; border-radius: 10px; font-size: 12px;
+    }
+    /* Helpful preview floor only when NOT in AR */
+    [hide-on-enter-ar] { transition: opacity .2s; }
   </style>
 </head>
-
 <body>
-  <!-- Simple UI that works in AR via DOM Overlay -->
+  <!-- UI that also works as WebXR DOM Overlay -->
   <div id="overlay">
+    <button id="start">Start AR</button>
     <button data-mode="snowman">Snowman</button>
     <button data-mode="pine">Pine</button>
     <button data-mode="both">Both</button>
     <button id="clear">Clear</button>
   </div>
+  <div id="status">mode: snowman</div>
 
-<a-scene
-  renderer="colorManagement: true; physicallyCorrectLights: true"
-  webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
-  xr-mode-ui="enterAREnabled: true; XRMode: ar"
-  ar-hit-test>
-      <!-- Lights -->
+  <a-scene
+    renderer="colorManagement:true; physicallyCorrectLights:true"
+    webxr="requiredFeatures: local; optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
+    xr-mode-ui="enabled: true"
+    ar-hit-test>
+    <!-- Lights -->
     <a-entity light="type: ambient; intensity: 0.5"></a-entity>
     <a-entity light="type: directional; intensity: 0.9" position="1 2 1"></a-entity>
 
@@ -54,80 +55,108 @@
 
   <script>
     const scene = document.querySelector('a-scene');
+    const statusEl = document.getElementById('status');
 
-    // --- UI state ---
-    let mode = 'snowman';
-    const modes = document.querySelectorAll('#overlay [data-mode]');
-    const clearBtn = document.getElementById('clear');
-    ['touchstart', 'click'].forEach(evt => {
-      modes.forEach(b => b.addEventListener(evt, e => { e.preventDefault(); mode = b.dataset.mode; }));
-      clearBtn.addEventListener(evt, e => {
-        e.preventDefault();
-        document.querySelectorAll('.spawned').forEach(e => e.remove());
-      });
+    // ---------- 1) START AR EXPLICITLY (forces camera permission prompt) ----------
+    const startBtn = document.getElementById('start');
+    const startAR = async () => {
+      try {
+        // Prefer dedicated enterAR() if available, otherwise enterVR() chooses AR when supported
+        if (scene.enterAR) await scene.enterAR(); else await scene.enterVR();
+      } catch (e) {
+        alert('AR not supported here. Open this page in Chrome on Android over HTTPS.');
+        console.error(e);
+      }
+    };
+    ['click','touchstart','pointerdown'].forEach(evt => {
+      startBtn.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); startAR(); }, {passive:false});
     });
 
-    // (Optional) quick logs to verify hit-test + surface
-    scene.addEventListener('ar-hit-test-start', () => console.log('[hit-test] scanning…'));
+    // ---------- 2) OVERLAY BUTTONS (work in and out of AR) ----------
+    let mode = 'snowman';
+    const setMode = m => { mode = m; statusEl.textContent = `mode: ${mode}`; };
+    document.querySelectorAll('#overlay [data-mode]').forEach(b => {
+      ['click','touchstart','pointerdown'].forEach(evt => {
+        b.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); setMode(b.dataset.mode); }, {passive:false});
+      });
+    });
+    const clearBtn = document.getElementById('clear');
+    ['click','touchstart','pointerdown'].forEach(evt => {
+      clearBtn.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation();
+        document.querySelectorAll('.spawned').forEach(e => e.remove());
+      }, {passive:false});
+    });
+
+    // Small diagnostics
+    scene.addEventListener('enter-vr', () => console.log('[XR] session started'));
+    scene.addEventListener('exit-vr',  () => console.log('[XR] session ended'));
+    scene.addEventListener('ar-hit-test-start',    () => console.log('[hit-test] scanning…'));
     scene.addEventListener('ar-hit-test-achieved', () => console.log('[hit-test] surface found'));
 
-    // --- Tap the screen to place (not the buttons) ---
+    // ---------- 3) TAP THE AR VIEW TO PLACE ----------
     scene.addEventListener('ar-hit-test-select', (e) => {
-      const { position, quaternion } = e.detail; // from ar-hit-test
+      const { position, quaternion } = e.detail; // provided by A-Frame's ar-hit-test
+      if (!position || !quaternion) return;
+
       if (mode === 'snowman' || mode === 'both') spawnSnowman(position, quaternion);
-      if (mode === 'pine' || mode === 'both') {
-        const p2 = position.clone(); if (mode === 'both') p2.x += 0.25;
+      if (mode === 'pine'    || mode === 'both') {
+        const p2 = position.clone(); if (mode === 'both') p2.x += 0.25; // offset when placing both
         spawnPine(p2, quaternion);
       }
     });
-    // A-Frame will create the proper WebXR anchor to keep it stable. :contentReference[oaicite:1]{index=1}
 
-
-    // --- Builders ---
+    // ---------- 4) BUILDERS ----------
     function spawnSnowman(pos, quat) {
-      const root = el(); root.setAttribute('shadow', 'cast:true; receive:true');
+      const root = makeRoot();
 
-      const b1 = part('a-sphere', { radius: 0.20, color: '#fff', position: '0 0.20 0' });
-      const b2 = part('a-sphere', { radius: 0.14, color: '#fff', position: '0 0.43 0' });
-      const b3 = part('a-sphere', { radius: 0.10, color: '#fff', position: '0 0.60 0' });
-      const nose = part('a-cone', { radiusBottom: 0.02, radiusTop: 0, height: 0.1, color: '#ff7f00', position: '0 0.60 0.10', rotation: '90 0 0' });
-      const brim = part('a-cylinder', { radius: 0.11, height: 0.01, color: '#111', position: '0 0.70 0' });
-      const top = part('a-cylinder', { radius: 0.07, height: 0.12, color: '#111', position: '0 0.77 0' });
-      const armL = part('a-cylinder', { radius: 0.01, height: 0.25, color: '#6d4c41', position: '-0.18 0.43 0', rotation: '0 0 45' });
-      const armR = part('a-cylinder', { radius: 0.01, height: 0.25, color: '#6d4c41', position: '0.18 0.43 0', rotation: '0 0 -45' });
-      const eyeL = part('a-sphere', { radius: 0.01, color: '#222', position: '-0.03 0.63 0.09' });
-      const eyeR = part('a-sphere', { radius: 0.01, color: '#222', position: '0.03 0.63 0.09' });
+      const b1 = part('a-sphere',{radius:0.20,color:'#fff',position:'0 0.20 0'});
+      const b2 = part('a-sphere',{radius:0.14,color:'#fff',position:'0 0.43 0'});
+      const b3 = part('a-sphere',{radius:0.10,color:'#fff',position:'0 0.60 0'});
+      const nose= part('a-cone',{radiusBottom:0.02,radiusTop:0,height:0.1,color:'#ff7f00',position:'0 0.60 0.10',rotation:'90 0 0'});
+      const brim= part('a-cylinder',{radius:0.11,height:0.01,color:'#111',position:'0 0.70 0'});
+      const top = part('a-cylinder',{radius:0.07,height:0.12,color:'#111',position:'0 0.77 0'});
+      const armL= part('a-cylinder',{radius:0.01,height:0.25,color:'#6d4c41',position:'-0.18 0.43 0',rotation:'0 0 45'});
+      const armR= part('a-cylinder',{radius:0.01,height:0.25,color:'#6d4c41',position:'0.18 0.43 0',rotation:'0 0 -45'});
+      const eyeL= part('a-sphere',{radius:0.01,color:'#222',position:'-0.03 0.63 0.09'});
+      const eyeR= part('a-sphere',{radius:0.01,color:'#222',position:'0.03 0.63 0.09'});
 
-      [b1, b2, b3, nose, brim, top, armL, armR, eyeL, eyeR].forEach(c => root.appendChild(c));
+      [b1,b2,b3,nose,brim,top,armL,armR,eyeL,eyeR].forEach(c=>root.appendChild(c));
       commit(root, pos, quat);
     }
 
     function spawnPine(pos, quat) {
-      const root = el(); root.setAttribute('shadow', 'cast:true; receive:true');
+      const root = makeRoot();
 
-      const trunk = part('a-cylinder', { radius: 0.05, height: 0.20, color: '#8d6e63', position: '0 0.10 0' });
-      const c1 = part('a-cone', { radiusBottom: 0.25, radiusTop: 0.02, height: 0.35, color: '#2e7d32', position: '0 0.35 0' });
-      const c2 = part('a-cone', { radiusBottom: 0.20, radiusTop: 0.02, height: 0.30, color: '#2e7d32', position: '0 0.55 0' });
-      const c3 = part('a-cone', { radiusBottom: 0.15, radiusTop: 0.02, height: 0.25, color: '#2e7d32', position: '0 0.70 0' });
+      const trunk = part('a-cylinder',{radius:0.05,height:0.20,color:'#8d6e63',position:'0 0.10 0'});
+      const c1 = part('a-cone',{radiusBottom:0.25,radiusTop:0.02,height:0.35,color:'#2e7d32',position:'0 0.35 0'});
+      const c2 = part('a-cone',{radiusBottom:0.20,radiusTop:0.02,height:0.30,color:'#2e7d32',position:'0 0.55 0'});
+      const c3 = part('a-cone',{radiusBottom:0.15,radiusTop:0.02,height:0.25,color:'#2e7d32',position:'0 0.70 0'});
 
-      [trunk, c1, c2, c3].forEach(c => root.appendChild(c));
+      [trunk,c1,c2,c3].forEach(c=>root.appendChild(c));
       commit(root, pos, quat);
     }
 
-    // --- helpers ---
-    function el() { const e = document.createElement('a-entity'); e.classList.add('spawned'); return e; }
-    function commit(root, pos, quat) {
+    // ---------- 5) HELPERS ----------
+    function makeRoot(){ const e=document.createElement('a-entity'); e.classList.add('spawned'); e.setAttribute('shadow','cast:true; receive:true'); return e; }
+    function commit(root, pos, quat){
       scene.appendChild(root);
+      // use object3D for precise placement from XR pose
       root.object3D.position.copy(pos);
       root.object3D.quaternion.copy(quat);
     }
-    function part(tag, props) {
+    function part(tag, props){
       const e = document.createElement(tag);
-      for (const [k, v] of Object.entries(props)) e.setAttribute(attrName(k), v);
+      for (const [k,v] of Object.entries(props)) e.setAttribute(k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), v);
       return e;
-      function attrName(k) { return k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()); }
     }
+
+    // ---------- 6) BASIC SUPPORT CHECK (nice to have) ----------
+    (async () => {
+      if (!('xr' in navigator)) { statusEl.textContent = 'WebXR not available'; return; }
+      const arOK = await navigator.xr.isSessionSupported('immersive-ar');
+      statusEl.textContent = arOK ? 'mode: snowman' : 'AR unsupported here';
+    })();
   </script>
 </body>
-
 </html>
