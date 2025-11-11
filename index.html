@@ -9,8 +9,9 @@
     html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
 
     /* On-screen UI that also works inside WebXR via dom-overlay */
-    #overlay, #ui {
-      position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+    #overlay, #ui { 
+      position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; 
+      z-index: 2147483647; /* keep HUD above A-Frame canvas */
     }
     #overlay { display: none; } /* hidden until AR session starts */
     .toolbar {
@@ -37,7 +38,7 @@
     #reticle[visible="true"] { animation: pulse 1.2s ease-in-out infinite; }
 
     /* Move default Enter AR button into bottom-right */
-    .a-enter-vr-button { right: 12px !important; bottom: 12px !important; }
+    .a-enter-vr-button { right: 12px !important; bottom: 12px !important; z-index: 2147483647 !important; }
   </style>
 </head>
 <body>
