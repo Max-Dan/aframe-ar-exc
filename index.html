@@ -4,18 +4,17 @@
     <meta charset="utf-8">
     <title>Hello, AR World! • A-Frame</title>
     <meta name="description" content="Hello, AR World! • A-Frame">
-
-    <!-- A-Frame with built-in AR components (ar-hit-test, hide-on-enter-ar, xr-mode-ui) -->
     <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.3/aframe/build/aframe-ar.min.js"></script>
+    <!-- script src="https://aframe.io/aframe/dist/aframe-master.min.js"></script -->
     <script>
       AFRAME.registerComponent('follow-shadow', {
         schema: {type: 'selector'},
-        init() { this.el.object3D.renderOrder = -1; },
+        init() {this.el.object3D.renderOrder = -1;},
         tick() {
           if (this.data) {
             this.el.object3D.position.copy(this.data.object3D.position);
-            this.el.object3D.position.y -= 0.001; // stop z-fighting
+            this.el.object3D.position.y-=0.001; // stop z-fighting
           }
         }
       });
@@ -23,46 +22,21 @@
   </head>
   <body>
     <a-scene
+      webxr="mode: ar; optionalFeatures: hit-test;"
       reflection="directionalLight: a-light[type=directional]"
       ar-hit-test="target: #objects;"
-      webxr="mode: ar; optionalFeatures: hit-test;"
-      renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic; alpha: true"
+      renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic"
       shadow="type: pcfsoft"
-      xr-mode-ui="XRMode: ar; enterVREnabled: false;"
-      embedded
+      xr-mode-ui="XRMode: xr"
     >
-      <a-light type="directional"
-               light="castShadow:true;"
-               position="1 1 1"
-               intensity="1.57"
-               shadow-camera-automatic="#objects">
-      </a-light>
-
-      <!-- Let WebXR control the camera; no manual position needed -->
-      <a-entity camera look-controls></a-entity>
-
-      <!-- This entity will be placed onto the real world using AR hit-test -->
-      <a-entity id="objects"
-                scale="0.2 0.2 0.2"
-                position="0 0 -1"
-                shadow
-                visible="false">
+      <a-light type="directional" light="castShadow:true;" position="1 1 1" intensity="1.57" shadow-camera-automatic="#objects"></a-light>
+      <a-camera position="0 0.4 0" wasd-controls="acceleration:10;"></a-camera>
+      <a-entity id="objects" scale="0.2 0.2 0.2" position="0 0 -1" shadow>
         <a-box position="-1 0.5 1" rotation="0 45 0" color="#4CC3D9"></a-box>
         <a-sphere position="0 1.25 -1" radius="1.25" color="#EF2D5E"></a-sphere>
         <a-cylinder position="1 0.75 1" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
       </a-entity>
-
-      <!-- Optional: shadow receiver in VR; you can add hide-on-enter-ar if you don't want a virtual floor in AR -->
-      <a-plane follow-shadow="#objects"
-               material="shader: shadow"
-               shadow="cast: false;"
-               rotation="-90 0 0"
-               width="2"
-               height="2"
-               hide-on-enter-ar>
-      </a-plane>
-
-      <!-- Sky is hidden in AR so the camera feed is used as background -->
+      <a-plane follow-shadow="#objects" material="shader:shadow" shadow="cast:false;" rotation="-90 0 0" width="2" height="2"></a-plane>
       <a-sky color="#ECECEC" hide-on-enter-ar></a-sky>
     </a-scene>
   </body>
