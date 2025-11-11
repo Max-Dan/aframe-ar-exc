@@ -74,7 +74,7 @@
 
   <script>
     // ------- WebXR Hit Test -> Reticle component -------
-    AFRAME.registerComponent('ar-hit-test', {
+    if (!AFRAME.components['winter-hit-test']) AFRAME.registerComponent('winter-hit-test', {
       init: function () {
         this.xrHitTestSource = null;
         this.viewerSpace = null;
@@ -133,7 +133,7 @@
     });
 
     // Attach the component to the scene
-    document.querySelector('a-scene').setAttribute('ar-hit-test', '');
+    document.querySelector('a-scene').setAttribute('winter-hit-test', '');
 
     // ------- Helpers to build geometry-made snowman & tree -------
     function createSnowman(scale = 1) {
