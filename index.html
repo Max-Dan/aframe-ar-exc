@@ -1,88 +1,163 @@
 <!doctype html>
 <html>
-
 <head>
   <meta charset="utf-8" />
   <title>Winter AR — Snowman & Pines</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <style>
-    body {
+    html, body {
       margin: 0;
+      height: 100%;
+      overflow: hidden;
       font-family: system-ui, sans-serif;
+      background: #000; /* transparent in AR */
     }
-
+    /* DOM Overlay UI (becomes the AR DOM overlay) */
     #overlay {
       position: fixed;
       inset: 8px auto auto 8px;
-      z-index: 9999;
+      z-index: 2147483647; /* sit on top of XR canvas */
       display: flex;
       gap: 8px;
+      pointer-events: auto;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      contain: layout style paint;
+      transform: translateZ(0); /* ensure overlay layer */
     }
-
     #overlay button {
       padding: 8px 12px;
       border-radius: 10px;
       border: 1px solid #ccc;
       background: #fff;
+      font-size: 14px;
+    }
+    #status {
+      position: fixed;
+      right: 8px;
+      top: 8px;
+      z-index: 2147483647;
+      color: #fff;
+      font-size: 12px;
+      opacity: 0.8;
+      background: rgba(0,0,0,0.4);
+      padding: 6px 8px;
+      border-radius: 8px;
+      max-width: 48ch;
     }
   </style>
 </head>
-
 <body>
-  <!-- Simple UI that works in AR via DOM Overlay -->
-  <div id="overlay">
+  <!-- Simple UI that also works in AR via DOM Overlay -->
+  <div id="overlay" role="toolbar" aria-label="AR controls">
     <button data-mode="snowman">Snowman</button>
     <button data-mode="pine">Pine</button>
     <button data-mode="both">Both</button>
     <button id="clear">Clear</button>
+    <button id="enterAR" title="Start AR on supported devices">Enter AR</button>
   </div>
+  <div id="status">Tip: On Chrome Android + HTTPS, tap <b>Enter AR</b> to start and then tap the surface to place objects.</div>
 
-<a-scene
-  renderer="colorManagement: true; physicallyCorrectLights: true"
-  webxr="requiredFeatures: hit-test,local; optionalFeatures: dom-overlay,unbounded; overlayElement: #overlay"
-  xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
-  ar-hit-test>
-
-      <!-- Lights -->
-    <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+  <a-scene
+    renderer="alpha: true; colorManagement: true; physicallyCorrectLights: true"
+    background="transparent: true"
+    webxr="optionalFeatures: dom-overlay, hit-test, unbounded; overlayElement: #overlay; referenceSpaceType: local"
+    xr-mode-ui="enabled: false"
+    vr-mode-ui="enabled: false"
+    ar-hit-test
+    embedded>
+      
+    <!-- Lights -->
+    <a-entity light="type: ambient; intensity: 0.6"></a-entity>
     <a-entity light="type: directional; intensity: 0.9" position="1 2 1"></a-entity>
 
     <!-- Desktop preview floor (hidden in AR) -->
     <a-plane width="6" height="6" rotation="-90 0 0" color="#e7eef7" hide-on-enter-ar></a-plane>
+
+    <!-- Camera for non-AR preview; AR overrides camera pose -->
     <a-camera position="0 1.6 0"></a-camera>
   </a-scene>
 
   <script>
     const scene = document.querySelector('a-scene');
+    const statusEl = document.getElementById('status');
 
-    // --- UI state ---
+    // --- Make overlay buttons truly clickable in AR ---
     let mode = 'snowman';
     const modes = document.querySelectorAll('#overlay [data-mode]');
     const clearBtn = document.getElementById('clear');
-    ['touchstart', 'click'].forEach(evt => {
-      modes.forEach(b => b.addEventListener(evt, e => { e.preventDefault(); mode = b.dataset.mode; }));
-      clearBtn.addEventListener(evt, e => {
-        e.preventDefault();
-        document.querySelectorAll('.spawned').forEach(e => e.remove());
+    const enterBtn = document.getElementById('enterAR');
+
+    // Helper to attach UI handlers (stop propagation so XR doesn't also receive a "select")
+    const attachUIHandler = (el, handler) => {
+      ['pointerdown','click','touchstart'].forEach(evt => {
+        el.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          handler(e);
+        }, {passive:false});
       });
+    };
+
+    modes.forEach(b => attachUIHandler(b, () => { mode = b.dataset.mode; flashStatus(`Mode: ${mode}`); }));
+    attachUIHandler(clearBtn, () => {
+      document.querySelectorAll('.spawned').forEach(e => e.remove());
+      flashStatus('Cleared');
     });
 
-    // (Optional) quick logs to verify hit-test + surface
-    scene.addEventListener('ar-hit-test-start', () => console.log('[hit-test] scanning…'));
-    scene.addEventListener('ar-hit-test-achieved', () => console.log('[hit-test] surface found'));
+    // Explicit AR start (reliably triggers camera permission)
+    attachUIHandler(enterBtn, async () => {
+      try {
+        if (!navigator.xr) {
+          flashStatus('WebXR not available here. Use Chrome on Android over HTTPS.');
+          return;
+        }
+        const isAR = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!isAR) {
+          flashStatus('Immersive AR not supported on this device/browser.');
+          return;
+        }
+        await scene.enterAR(); // A-Frame will request the AR session w/ our webxr config
+      } catch (err) {
+        console.warn(err);
+        flashStatus('Failed to start AR (see console).');
+      }
+    });
+
+    // Status helper
+    let statusTimer;
+    function flashStatus(msg) {
+      statusEl.textContent = msg;
+      statusEl.style.opacity = 0.95;
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => { statusEl.style.opacity = 0.75; }, 1800);
+    }
+
+    // (Optional) logs to verify hit-test + surface
+    scene.addEventListener('ar-hit-test-start', () => flashStatus('Scanning for surfaces…'));
+    scene.addEventListener('ar-hit-test-achieved', () => flashStatus('Surface found. Tap to place!'));
+
+    // Hide preview-only entities when AR starts, show when AR ends
+    AFRAME.registerComponent('hide-on-enter-ar', {
+      init() {
+        const el = this.el;
+        const scn = el.sceneEl;
+        scn.addEventListener('enter-vr', () => { if (scn.is('ar-mode')) el.setAttribute('visible', false); });
+        scn.addEventListener('exit-vr',  () => { el.setAttribute('visible', true); });
+      }
+    });
 
     // --- Tap the screen to place (not the buttons) ---
     scene.addEventListener('ar-hit-test-select', (e) => {
-      const { position, quaternion } = e.detail; // from ar-hit-test
+      const { position, quaternion } = e.detail; // provided by ar-hit-test
       if (mode === 'snowman' || mode === 'both') spawnSnowman(position, quaternion);
       if (mode === 'pine' || mode === 'both') {
         const p2 = position.clone(); if (mode === 'both') p2.x += 0.25;
         spawnPine(p2, quaternion);
       }
     });
-    // A-Frame will create the proper WebXR anchor to keep it stable. :contentReference[oaicite:1]{index=1}
-
 
     // --- Builders ---
     function spawnSnowman(pos, quat) {
@@ -93,7 +168,7 @@
       const b3 = part('a-sphere', { radius: 0.10, color: '#fff', position: '0 0.60 0' });
       const nose = part('a-cone', { radiusBottom: 0.02, radiusTop: 0, height: 0.1, color: '#ff7f00', position: '0 0.60 0.10', rotation: '90 0 0' });
       const brim = part('a-cylinder', { radius: 0.11, height: 0.01, color: '#111', position: '0 0.70 0' });
-      const top = part('a-cylinder', { radius: 0.07, height: 0.12, color: '#111', position: '0 0.77 0' });
+      const top  = part('a-cylinder', { radius: 0.07, height: 0.12, color: '#111', position: '0 0.77 0' });
       const armL = part('a-cylinder', { radius: 0.01, height: 0.25, color: '#6d4c41', position: '-0.18 0.43 0', rotation: '0 0 45' });
       const armR = part('a-cylinder', { radius: 0.01, height: 0.25, color: '#6d4c41', position: '0.18 0.43 0', rotation: '0 0 -45' });
       const eyeL = part('a-sphere', { radius: 0.01, color: '#222', position: '-0.03 0.63 0.09' });
@@ -128,7 +203,22 @@
       return e;
       function attrName(k) { return k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()); }
     }
+
+    // Nice-to-have: tell user what's supported
+    (async () => {
+      if (!('xr' in navigator)) {
+        flashStatus('WebXR not available. You can still preview the scene.');
+        return;
+      }
+      try {
+        const arOK = await navigator.xr.isSessionSupported('immersive-ar');
+        if (arOK) {
+          flashStatus('Ready for AR. Tap Enter AR, then tap a surface to place objects.');
+        } else {
+          flashStatus('Immersive AR not supported here. Preview only.');
+        }
+      } catch {}
+    })();
   </script>
 </body>
-
 </html>
