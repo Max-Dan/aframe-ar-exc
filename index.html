@@ -9,9 +9,10 @@
     html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
 
     /* On-screen UI that also works inside WebXR via dom-overlay */
-    #overlay {
+    #overlay, #ui {
       position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
     }
+    #overlay { display: none; } /* hidden until AR session starts */
     .toolbar {
       pointer-events: auto; display: flex; gap: .5rem; align-items: center; justify-content: center; flex-wrap: wrap;
       background: rgba(0,0,0,.55); padding: .6rem; border-radius: 14px; margin: .75rem auto 0; width: min(720px, calc(100% - 1.5rem));
@@ -35,20 +36,31 @@
     @keyframes pulse { 0% { transform: scale(1); opacity: .9;} 50% { transform: scale(1.05); opacity: .6;} 100% { transform: scale(1); opacity: .9;} }
     #reticle[visible="true"] { animation: pulse 1.2s ease-in-out infinite; }
 
-    /* Hide default VR splash (we rely on the Enter AR button) */
+    /* Move default Enter AR button into bottom-right */
     .a-enter-vr-button { right: 12px !important; bottom: 12px !important; }
   </style>
 </head>
 <body>
   <!-- Overlay UI that will also show inside AR via WebXR dom-overlay -->
+  <div id="ui">
+    <div class="toolbar">
+      <button data-action="snowman">⛄ Place Snowman</button>
+      <button data-action="tree">🌲 Place Tree</button>
+      <button data-action="both">⛄+🌲 Both</button>
+      <button data-action="clear" class="clear">🧹 Clear</button>
+    </div>
+    <div class="hint">Tap <strong>Enter AR</strong>, move your device to find a flat surface. A white ring will appear when a plane is detected. Use the buttons above to place items at the ring.</div>
+  </div>
+
+  <!-- DOM Overlay root only for AR session -->
   <div id="overlay">
     <div class="toolbar">
-      <button id="btnSnowman">⛄ Place Snowman</button>
-      <button id="btnTree">🌲 Place Tree</button>
-      <button id="btnBoth">⛄+🌲 Both</button>
-      <button id="btnClear" class="clear">🧹 Clear</button>
+      <button data-action="snowman">⛄ Place Snowman</button>
+      <button data-action="tree">🌲 Place Tree</button>
+      <button data-action="both">⛄+🌲 Both</button>
+      <button data-action="clear" class="clear">🧹 Clear</button>
     </div>
-    <div class="hint" id="hint">Tap <strong>Enter AR</strong>, move your device to find a flat surface. A white ring will appear when a plane is detected. Use the buttons above to place items at the ring.</div>
+    <div class="hint">You are in AR. Aim the ring and use the buttons to place items.</div>
   </div>
 
   <a-scene
@@ -262,7 +274,6 @@
     // ------- Placement helpers -------
     const reticle = document.getElementById('reticle');
     const placements = document.getElementById('placements');
-    const hint = document.getElementById('hint');
 
     function placeAtReticle(makeEntityFn) {
       if (reticle.getAttribute('visible') !== true && reticle.getAttribute('visible') !== 'true') {
@@ -289,26 +300,43 @@
       while (placements.firstChild) placements.removeChild(placements.firstChild);
     }
 
-    // ------- Wire up buttons -------
-    document.getElementById('btnSnowman').addEventListener('click', () => {
-      placeAtReticle(() => createSnowman(1));
-    });
-    document.getElementById('btnTree').addEventListener('click', () => {
-      placeAtReticle(() => createPine(1));
-    });
-    document.getElementById('btnBoth').addEventListener('click', () => {
-      placeAtReticle(() => {
-        const group = document.createElement('a-entity');
-        const snowman = createSnowman(1);
-        const tree = createPine(1);
-        snowman.setAttribute('position', '-0.25 0 0');
-        tree.setAttribute('position', '0.25 0 0');
-        group.appendChild(snowman);
-        group.appendChild(tree);
-        return group;
+    // ------- Wire up buttons (both UI and overlay) -------
+    function wireToolbar(root){
+      if (!root) return;
+      const btnSnow = root.querySelector('[data-action="snowman"]');
+      const btnTree = root.querySelector('[data-action="tree"]');
+      const btnBoth = root.querySelector('[data-action="both"]');
+      const btnClear = root.querySelector('[data-action="clear"]');
+      if (btnSnow) btnSnow.addEventListener('click', () => { placeAtReticle(() => createSnowman(1)); });
+      if (btnTree) btnTree.addEventListener('click', () => { placeAtReticle(() => createPine(1)); });
+      if (btnBoth) btnBoth.addEventListener('click', () => {
+        placeAtReticle(() => {
+          const group = document.createElement('a-entity');
+          const snowman = createSnowman(1);
+          const tree = createPine(1);
+          snowman.setAttribute('position', '-0.25 0 0');
+          tree.setAttribute('position', '0.25 0 0');
+          group.appendChild(snowman); group.appendChild(tree);
+          return group;
+        });
       });
+      if (btnClear) btnClear.addEventListener('click', () => {
+        while (placements.firstChild) placements.removeChild(placements.firstChild);
+      });
+    }
+    wireToolbar(document.getElementById('ui'));
+    wireToolbar(document.getElementById('overlay'));
+
+    // Toggle which HUD is visible depending on AR mode
+    const sceneEl = document.querySelector('a-scene');
+    const overlayRoot = document.getElementById('overlay');
+    const uiRoot = document.getElementById('ui');
+    sceneEl.addEventListener('enter-vr', () => {
+      if (sceneEl.is('ar-mode')) { overlayRoot.style.display = 'flex'; uiRoot.style.display = 'none'; }
     });
-    document.getElementById('btnClear').addEventListener('click', clearAll);
+    sceneEl.addEventListener('exit-vr', () => {
+      overlayRoot.style.display = 'none'; uiRoot.style.display = 'flex';
+    });
 
     // Optional: simple snowfall for atmosphere
     ;(function snowfall(){
