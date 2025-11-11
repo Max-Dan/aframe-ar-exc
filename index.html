@@ -45,12 +45,13 @@
   <!-- Overlay UI that will also show inside AR via WebXR dom-overlay -->
   <div id="ui">
     <div class="toolbar">
+      <button id="startAR">🚀 Start AR</button>
       <button data-action="snowman">⛄ Place Snowman</button>
       <button data-action="tree">🌲 Place Tree</button>
       <button data-action="both">⛄+🌲 Both</button>
       <button data-action="clear" class="clear">🧹 Clear</button>
     </div>
-    <div class="hint">Tap <strong>Enter AR</strong>, move your device to find a flat surface. A white ring will appear when a plane is detected. Use the buttons above to place items at the ring.</div>
+    <div class="hint" id="preHint">Tap <strong>Start AR</strong> then move your device to find a flat surface. Must be served over <strong>HTTPS</strong> (or <code>localhost</code>) on an AR‑capable mobile browser.</div>
   </div>
 
   <!-- DOM Overlay root only for AR session -->
@@ -66,7 +67,7 @@
 
   <a-scene
     renderer="physicallyCorrectLights: true; colorManagement: true; antialias: true"
-    webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
+    webxr="requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #overlay"
     background="color: #87CEEB">
 
     <!-- Lights -->
@@ -326,6 +327,32 @@
       });
     }
     wireToolbar(document.getElementById('ui'));
+
+    // Start AR button & support checks
+    const startAR = document.getElementById('startAR');
+    const preHint = document.getElementById('preHint');
+    if (startAR) {
+      startAR.addEventListener('click', async () => {
+        try { document.querySelector('a-scene').enterVR(); } catch(e) { console.warn(e); }
+      });
+    }
+    (async function supportChecks(){
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        preHint && (preHint.textContent = 'This page must be served over HTTPS (or localhost) for camera access.');
+      }
+      if (!('xr' in navigator)) {
+        preHint && (preHint.textContent = 'WebXR not available in this browser. Use Chrome on Android or iOS 17+ Safari.');
+        if (startAR) startAR.disabled = true;
+        return;
+      }
+      try {
+        const ok = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!ok) {
+          preHint && (preHint.textContent = 'Immersive AR not supported on this device/browser.');
+          if (startAR) startAR.disabled = true;
+        }
+      } catch (e) { /* ignore */ }
+    })();
     wireToolbar(document.getElementById('overlay'));
 
     // Toggle which HUD is visible depending on AR mode
