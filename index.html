@@ -1,632 +1,69 @@
 <!DOCTYPE html>
 <html>
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <!-- we import arjs version without NFT but with marker + location based support -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        
-        .controls {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            z-index: 1000;
-            max-height: 50vh;
-            overflow-y: auto;
-            display: none; /* Start hidden */
-        }
-        
-        .control-group {
-            margin-bottom: 12px;
-        }
-        
-        .control-label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 13px;
-            font-weight: bold;
-        }
-        
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .slider {
-            flex: 1;
-            height: 30px;
-            -webkit-appearance: none;
-            background: #333;
-            border-radius: 5px;
-            outline: none;
-        }
-        
-        .slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 25px;
-            height: 25px;
-            background: #4CAF50;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        
-        .slider::-moz-range-thumb {
-            width: 25px;
-            height: 25px;
-            background: #4CAF50;
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .value-display {
-            min-width: 50px;
-            text-align: center;
-            background: #333;
-            padding: 3px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-        }
-        
-        .toggle-btn {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border: 2px solid rgba(255,255,255,0.3);
-            padding: 12px;
-            border-radius: 50%;
-            font-size: 16px;
-            cursor: pointer;
-            z-index: 1001;
-            width: 45px;
-            height: 45px;
-        }
-        
-        .reset-btn {
-            background: #FF6B6B;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            font-size: 12px;
-            cursor: pointer;
-            margin-top: 10px;
-            width: 100%;
-        }
-        
-        .translation-btn {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 3px;
-            font-size: 11px;
-            cursor: pointer;
-            flex: 1;
-            min-width: 60px;
-        }
-        
-        .translation-btn:hover {
-            background: #45a049;
-        }
-        
-        .translation-btn.active {
-            background: #FFD700;
-            color: black;
-        }
-        
-        .stories-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0, 100, 200, 0.9);
-            color: white;
-            border: 2px solid rgba(255,255,255,0.3);
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1001;
-            transition: all 0.3s ease;
-        }
-        
-        .stories-btn:hover {
-            background: rgba(0, 120, 220, 0.9);
-            transform: scale(1.05);
-        }
-        
-        .stories-btn.hidden {
-            background: rgba(150, 150, 150, 0.9);
-        }
-    </style>
-    <body>
-        <button class="toggle-btn" id="toggleBtn">⚙️</button>
-        
-        <button class="stories-btn" id="storiesBtn" onclick="play()">📖 Show Stories</button>
-        
-        <div class="controls" id="controls">
-            <div class="control-group">
-                <label class="control-label">Scale</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="scaleSlider" min="50" max="300" value="150">
-                    <span class="value-display" id="scaleValue">150</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Position X</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="posXSlider" min="-4" max="4" step="0.1" value="0">
-                    <span class="value-display" id="posXValue">0.0</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Position Y</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="posYSlider" min="-4" max="4" step="0.1" value="0">
-                    <span class="value-display" id="posYValue">0.0</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Position Z</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="posZSlider" min="-4" max="4" step="0.1" value="0">
-                    <span class="value-display" id="posZValue">0.0</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Rotation X</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="rotXSlider" min="0" max="360" value="0">
-                    <span class="value-display" id="rotXValue">0°</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Rotation Y</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="rotYSlider" min="0" max="360" value="0">
-                    <span class="value-display" id="rotYValue">0°</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label class="control-label">Rotation Z</label>
-                <div class="slider-container">
-                    <input type="range" class="slider" id="rotZSlider" min="0" max="360" value="0">
-                    <span class="value-display" id="rotZValue">0°</span>
-                </div>
-            </div>
-            
-            <button class="reset-btn" id="resetBtn">Reset to Default</button>
-            
-            <!-- Add translation controls -->
-            <div class="control-group">
-                <label class="control-label">Translations</label>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="translation-btn" id="frontBtn" data-text="frontText">Front</button>
-                    <button class="translation-btn" id="leftBtn" data-text="leftText">Left</button>
-                    <button class="translation-btn" id="rightBtn" data-text="rightText">Right</button>
-                    <button class="translation-btn" id="hideAllBtn">Hide All</button>
-                </div>
-            </div>
-        </div>
-        
-        <!--Test-->
-        <script>
-            AFRAME.registerComponent('frame-corners', {
-                schema: {
-                    inset: { type: 'number', default: 0.15 },
-                    size: { type: 'number', default: 0.35 },
-                    z: { type: 'number', default: 0.03 },
-                    srcTL: { type: 'selector' },
-                    srcTR: { type: 'selector' },
-                    srcBL: { type: 'selector' },
-                    srcBR: { type: 'selector' }
-                },
-                init: function () {
-                    this.imgTL = document.createElement('a-image');
-                    this.imgTR = document.createElement('a-image');
-                    this.imgBL = document.createElement('a-image');
-                    this.imgBR = document.createElement('a-image');
+  <head>
+    <meta charset="utf-8">
+    <title>Hello, AR World! • A-Frame</title>
+    <meta name="description" content="Hello, AR World! • A-Frame">
 
-                    const imgs = [this.imgTL, this.imgTR, this.imgBL, this.imgBR];
-                    imgs.forEach(img => {
-                        img.setAttribute('width', this.data.size);
-                        img.setAttribute('height', this.data.size);
-                        // flat = unlit (good for UI), transparent for PNGs
-                        img.setAttribute('material', 'shader: flat; transparent: true; alphaTest: 0.01; color: #FFFFFF; side: front');
-                        this.el.appendChild(img);
-                    });
+    <!-- A-Frame with built-in AR components (ar-hit-test, hide-on-enter-ar, xr-mode-ui) -->
+    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 
-                    // IMPORTANT: set src with a selector string, not the element object
-                    if (this.data.srcTL) this.imgTL.setAttribute('src', `#${this.data.srcTL.id}`);
-                    if (this.data.srcTR) this.imgTR.setAttribute('src', `#${this.data.srcTR.id}`);
-                    if (this.data.srcBL) this.imgBL.setAttribute('src', `#${this.data.srcBL.id}`);
-                    if (this.data.srcBR) this.imgBR.setAttribute('src', `#${this.data.srcBR.id}`);
+    <script>
+      AFRAME.registerComponent('follow-shadow', {
+        schema: {type: 'selector'},
+        init() { this.el.object3D.renderOrder = -1; },
+        tick() {
+          if (this.data) {
+            this.el.object3D.position.copy(this.data.object3D.position);
+            this.el.object3D.position.y -= 0.001; // stop z-fighting
+          }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene
+      reflection="directionalLight: a-light[type=directional]"
+      ar-hit-test="target: #objects;"
+      webxr="mode: ar; optionalFeatures: hit-test;"
+      renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic; alpha: true"
+      shadow="type: pcfsoft"
+      xr-mode-ui="XRMode: ar; enterVREnabled: false;"
+      embedded
+    >
+      <a-light type="directional"
+               light="castShadow:true;"
+               position="1 1 1"
+               intensity="1.57"
+               shadow-camera-automatic="#objects">
+      </a-light>
 
-                    this.updatePositions = this.updatePositions.bind(this);
-                    this.el.addEventListener('loaded', this.updatePositions);
-                    this.el.addEventListener('componentchanged', (e) => {
-                        if (e.detail.name === 'geometry' || e.detail.name === 'text') this.updatePositions();
-                    });
-                },
-                updatePositions: function () {
-                    const geo = this.el.getAttribute('geometry') || {};
-                    const width = Number(geo.width) || 5;
-                    const height = Number(geo.height) || 3;
+      <!-- Let WebXR control the camera; no manual position needed -->
+      <a-entity camera look-controls></a-entity>
 
-                    const inset = this.data.inset;
-                    const z = this.data.z;
+      <!-- This entity will be placed onto the real world using AR hit-test -->
+      <a-entity id="objects"
+                scale="0.2 0.2 0.2"
+                position="0 0 -1"
+                shadow
+                visible="false">
+        <a-box position="-1 0.5 1" rotation="0 45 0" color="#4CC3D9"></a-box>
+        <a-sphere position="0 1.25 -1" radius="1.25" color="#EF2D5E"></a-sphere>
+        <a-cylinder position="1 0.75 1" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
+      </a-entity>
 
-                    const leftX = -width / 2 + inset;
-                    const rightX = width / 2 - inset;
-                    const topY = height / 2 - inset;
-                    const bottomY = -height / 2 + inset;
+      <!-- Optional: shadow receiver in VR; you can add hide-on-enter-ar if you don't want a virtual floor in AR -->
+      <a-plane follow-shadow="#objects"
+               material="shader: shadow"
+               shadow="cast: false;"
+               rotation="-90 0 0"
+               width="2"
+               height="2"
+               hide-on-enter-ar>
+      </a-plane>
 
-                    this.imgTL.setAttribute('position', `${leftX} ${topY} ${z}`);
-                    this.imgTR.setAttribute('position', `${rightX} ${topY} ${z}`);
-                    this.imgBL.setAttribute('position', `${leftX} ${bottomY} ${z}`);
-                    this.imgBR.setAttribute('position', `${rightX} ${bottomY} ${z}`);
-                }
-            });
-        </script>
-
-
-        <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3 ">
-            <a-assets>
-                <img id="TL" src="frame-tl.png">
-                <img id="TR" src="frame-tr.png">
-                <img id="BL" src="frame-bl.png">
-                <img id="BR" src="frame-br.png">
-            </a-assets>
-            <a-marker 
-                preset="kanji"
-                smooth="true"
-                smoothCount="10"
-                smoothTolerance="0.01"
-                smoothThreshold="5"
-                raycaster="objects: .clickable">
-                <a-entity
-                    id="model"
-                    position="0 0 0"
-                    scale="150 150 150"
-                    rotation="0 30 0"
-                    gltf-model="/Painted_Rock_rc10.glb"
-                ></a-entity>
-                
-                <a-text 
-                    id="frontText"
-                    value="A millennium after Harald Bluetooth united Denmark and Norway, industry leaders Intel, Ericsson, Nokia, IBM and Toshiba met. During the meeting, Jim Kardach, having recently read about Viking history, had learned how Harald had unified Scandinavia and marked his achievement with the Jelling runestones. He proposed 'Bluetooth' as a placeholder name for the new wireless standard, intending to unite devices just as Harald united kingdoms. The iconic Bluetooth logo combines Harald's initials in ancient Norse bindrunes: ᚼ (H for Harald) and ᛒ (B for Bluetooth). The founding members of the Bluetooth Special Interest Group made pilgrimages to Jelling in 1998 and returned for the 25th anniversary in 2023, paying homage to their technology's namesake."
-                    position="0.189 1.75 0.645"
-                    roatation=" 10 -2.62 7.12"
-                    align="center"
-                    color="#000000"
-                    font="roboto"
-                    width="4"
-                    scale="0.5 0.5 0.5"
-                    geometry="primitive: plane; width: 5; height: 3.3"
-                    material="color: rgba(255,255,255,0.9); opacity: 1"
-                    visible="true"
-                    text="zOffset: 0.05"
-                    frame-corners="srcTL: #TL; srcTR: #TR; srcBL: #BL; srcBR: #BR; inset: 0.2; size: 2; z: 0.03"
-                    >
-                </a-text>
-
-                <!-- Translation text for Left side -->
-                <a-text 
-                    id="leftText"
-                    value="While Harald Bluetooth commissioned the stone, recent research reveals that Queen Thyra; Harald's mother may have been the true architect of Danish unity. Thyra's name appears on four runestones across Denmark, more than any other individual from the Viking Age. The smaller Jelling stone, erected by Gorm, calls Thyra 'Denmark's salvation'. Using 3D scanning technology, researchers discovered that the same runemaster, carved both major Jelling stones and the Læborg stone, which reads: 'Ravnunge-Tue carved these runes in memory of Thyra, his queen'. This connection proves all references point to the same powerful woman. Medieval historians described Thyra as wise, resourceful, and credited her with building the Danevirke defensive wall."
-                    position="1.85 1.75 -0.68"
-                    align="center"
-                    color="#000000"
-                    font="roboto"
-                    width="4"
-                    scale="0.5 0.5 0.5"
-                    rotation="-21 111 4.5"
-                    geometry="primitive: plane; width: 5; height: 3"
-                    material="color: rgba(255,255,255,0.9); opacity: 1"
-                    visible="true"
-                    text="zOffset: 0.05"
-                    frame-corners="srcTL: #TL; srcTR: #TR; srcBL: #BL; srcBR: #BR; inset: 0.2; size: 2; z: 0.03"
-                    >
-                </a-text>
-
-                <!-- Translation text for Right side -->
-                <a-text 
-                    id="rightText"
-                    value="The Jelling Stone appears to capture a pivotal moment of religious transformation. Evidence suggests King Gorm the Old was buried in an oak chamber in the North Mound around 958-959, following what seem to be traditional pagan customs. His son Harald likely converted to Christianity around 960 and researchers believe he had his father's remains moved into a newly constructed wooden church between the mounds, possibly giving Gorm a Christian reburial. Harald then erected the great runestone with both Christian imagery and elements pagans could understand, potentially easing the population's transition to the new faith. The stone may have served as propaganda, announcing that the old ways were ending and a new Christian era had begun."
-                    align="center"
-                    color="#000000"
-                    font="roboto"
-                    width="4"
-                    scale="0.5 0.5 0.5"
-                    rotation="0 -170 0"
-                    position="-0.27 1.75 -1"
-                    geometry="primitive: plane; width: 5; height: 3.3"
-                    material="color: rgba(255,255,255,0.9); opacity: 1"
-                    visible="true"
-                    text="zOffset: 0.05"
-                    frame-corners="srcTL: #TL; srcTR: #TR; srcBL: #BL; srcBR: #BR; inset: 0.2; size: 2; z: 0.03"
-                    >
-                </a-text>
-            </a-marker>
-            <a-entity camera></a-entity>
-        </a-scene>
-        
-        <script>
-            // Get references to DOM elements
-            const model = document.querySelector('#model');
-            const toggleBtn = document.querySelector('#toggleBtn');
-            const controls = document.querySelector('#controls');
-            const resetBtn = document.querySelector('#resetBtn');
-            
-            const scaleSlider = document.querySelector('#scaleSlider');
-            const scaleValue = document.querySelector('#scaleValue');
-            
-            const posXSlider = document.querySelector('#posXSlider');
-            const posXValue = document.querySelector('#posXValue');
-            
-            const posYSlider = document.querySelector('#posYSlider');
-            const posYValue = document.querySelector('#posYValue');
-            
-            const posZSlider = document.querySelector('#posZSlider');
-            const posZValue = document.querySelector('#posZValue');
-            
-            const rotXSlider = document.querySelector('#rotXSlider');
-            const rotXValue = document.querySelector('#rotXValue');
-            
-            const rotYSlider = document.querySelector('#rotYSlider');
-            const rotYValue = document.querySelector('#rotYValue');
-            
-            const rotZSlider = document.querySelector('#rotZSlider');
-            const rotZValue = document.querySelector('#rotZValue');
-            
-            // Translation elements
-            const frontText = document.querySelector('#frontText');
-            const leftText = document.querySelector('#leftText');
-            const rightText = document.querySelector('#rightText');
-            
-            const frontBtn = document.querySelector('#frontBtn');
-            const leftBtn = document.querySelector('#leftBtn');
-            const rightBtn = document.querySelector('#rightBtn');
-            const hideAllBtn = document.querySelector('#hideAllBtn');
-            
-            // Stories button
-            const storiesBtn = document.querySelector('#storiesBtn');
-            let storiesVisible = true;
-            var audio = new Audio('Nordic_music.mp3');
-            
-            // Default values
-            const defaults = {
-                scale: 150,
-                posX: 0,
-                posY: 0,
-                posZ: 0,
-                rotX: 0,
-                rotY: 0,
-                rotZ: 0
-            };
-            
-            // Text size states
-            const textSizes = {
-                normal: "0.5 0.5 0.5",
-                small: "0.2 0.2 0.2"
-            };
-            
-            // Debounce function for performance
-            function debounce(func, wait) {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            }
-            
-            function play() {
-            if (!storiesVisible){
-                // var audio = new Audio('Star_Wars.mp3');
-                audio.play();
-            } else{
-                audio.pause();
-                audio.currentTime = 0;
-            }
-            }
-            // Toggle controls visibility
-            toggleBtn.addEventListener('click', () => {
-                controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
-            });
-            
-            // Reset to defaults
-            resetBtn.addEventListener('click', () => {
-                // Direct mapping instead of string manipulation
-                scaleSlider.value = defaults.scale;
-                scaleValue.textContent = defaults.scale;
-                
-                posXSlider.value = defaults.posX;
-                posXValue.textContent = defaults.posX.toFixed(1);
-                
-                posYSlider.value = defaults.posY;
-                posYValue.textContent = defaults.posY.toFixed(1);
-                
-                posZSlider.value = defaults.posZ;
-                posZValue.textContent = defaults.posZ.toFixed(1);
-                
-                rotXSlider.value = defaults.rotX;
-                rotXValue.textContent = defaults.rotX + '°';
-                
-                rotYSlider.value = defaults.rotY;
-                rotYValue.textContent = defaults.rotY + '°';
-                
-                rotZSlider.value = defaults.rotZ;
-                rotZValue.textContent = defaults.rotZ + '°';
-                
-                updateModel();
-            });
-            
-            // Translation control functions
-            function hideAllTranslations() {
-                frontText.setAttribute('visible', false);
-                leftText.setAttribute('visible', false);
-                rightText.setAttribute('visible', false);
-                frontText.setAttribute('width', 0);
-                leftText.setAttribute('width', 0);
-                rightText.setAttribute('width', 0);
-
-                
-                // Remove active class from all buttons
-                document.querySelectorAll('.translation-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-            }
-            
-            function toggleTranslation(textElement, button) {
-                const isVisible = textElement.getAttribute('visible');
-                
-                if (isVisible === 'true' || isVisible === true) {
-                    textElement.setAttribute('visible', false);
-                    button.classList.remove('active');
-                } else {
-                    textElement.setAttribute('visible', true);
-                    button.classList.add('active');
-                }
-            }
-            
-            // Translation button event listeners
-            frontBtn.addEventListener('click', () => {
-                toggleTranslation(frontText, frontBtn);
-            });
-            
-            leftBtn.addEventListener('click', () => {
-                toggleTranslation(leftText, leftBtn);
-            });
-            
-            rightBtn.addEventListener('click', () => {
-                toggleTranslation(rightText, rightBtn);
-            });
-            
-            hideAllBtn.addEventListener('click', () => {
-                hideAllTranslations();
-            });
-            
-            function toggleStories() {
-                storiesVisible = !storiesVisible;
-                
-                // Toggle visibility instead of scale
-                frontText.setAttribute('visible', storiesVisible);
-                leftText.setAttribute('visible', storiesVisible);
-                rightText.setAttribute('visible', storiesVisible);
-                
-                // Update button text and style
-                if (storiesVisible) {
-                    storiesBtn.textContent = '📖 Hide Stories';
-                    storiesBtn.classList.remove('hidden');
-                    
-                    // Reactivate individual translation buttons if they were active before
-                    frontBtn.classList.add('active');
-                    leftBtn.classList.add('active');
-                    rightBtn.classList.add('active');
-                } else {
-                    storiesBtn.textContent = '📖 Show Stories';
-                    storiesBtn.classList.add('hidden');
-                    
-                    // Remove active state from individual buttons when stories are hidden
-                    frontBtn.classList.remove('active');
-                    leftBtn.classList.remove('active');
-                    rightBtn.classList.remove('active');
-                }
-            }
-
-            // Stories button functionality
-            storiesBtn.addEventListener('click', () => {
-                toggleStories();
-            });
-            toggleStories();
-
-            // Update model helper to also update text positions
-            const updateModel = debounce(() => {
-                const scale = scaleSlider.value;
-                const x = parseFloat(posXSlider.value);
-                const y = parseFloat(posYSlider.value);
-                const z = parseFloat(posZSlider.value);
-                const rotX = rotXSlider.value;
-                const rotY = rotYSlider.value;
-                const rotZ = rotZSlider.value;
-                
-                model.setAttribute('scale', `${scale} ${scale} ${scale}`);
-                model.setAttribute('position', `${x} ${y} ${z}`);
-                model.setAttribute('rotation', `${rotX} ${rotY} ${rotZ}`);
-                
-                // Update text positions relative to model
-                const textY = y + (2 * scale / 100);
-                const textOffset = 1.5 * scale / 100;
-                
-                frontText.setAttribute('position', `${x} ${textY} ${z + textOffset}`);
-                leftText.setAttribute('position', `${x - textOffset} ${textY} ${z}`);
-                rightText.setAttribute('position', `${x + textOffset} ${textY} ${z}`);
-            }, 50);
-            
-            // Scale control
-            scaleSlider.addEventListener('input', (e) => {
-                scaleValue.textContent = e.target.value;
-                updateModel();
-            });
-            
-            // Position controls
-            [posXSlider, posYSlider, posZSlider].forEach((slider, index) => {
-                const axes = ['X', 'Y', 'Z'];
-                slider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    document.querySelector(`#pos${axes[index]}Value`).textContent = value.toFixed(1);
-                    updateModel();
-                });
-            });
-            
-            // Rotation controls
-            [rotXSlider, rotYSlider, rotZSlider].forEach((slider, index) => {
-                const axes = ['X', 'Y', 'Z'];
-                slider.addEventListener('input', (e) => {
-                    const value = e.target.value;
-                    document.querySelector(`#rot${axes[index]}Value`).textContent = value + '°';
-                    updateModel();
-                });
-            });
-            
-            // Translation buttons
-            document.querySelectorAll('.translation-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const action = e.target.id.replace('Btn', '');
-                    const textId = e.target.getAttribute('data-text');
-                    
-                    if (action === 'hideAll') {
-                        hideAllTranslations();
-                    } else {
-                        const textEl = document.querySelector(`#${textId}`);
-                        const button = e.target;
-                        toggleTranslation(textEl, button);
-                    }
-                });
-            });
-        </script>
-    </body>
+      <!-- Sky is hidden in AR so the camera feed is used as background -->
+      <a-sky color="#ECECEC" hide-on-enter-ar></a-sky>
+    </a-scene>
+  </body>
 </html>
